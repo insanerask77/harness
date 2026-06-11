@@ -27,7 +27,7 @@ services:
       # GHA: los contenedores que act lanza necesitan llegar a gitness
       # En Linux con Docker nativo, la IP del gateway es la del host.
       # En Docker Desktop (Mac/Windows) usa host.docker.internal.
-      GITNESS_CI_GHA_GIT_HOST: "host.docker.internal:3000"
+      GITNESS_CI_GHA_GIT_HOST: "localhost:3000"
 
       # Webhooks hacia localhost están permitidos (útil para desarrollo)
       GITNESS_WEBHOOK_ALLOW_LOOPBACK: "true"

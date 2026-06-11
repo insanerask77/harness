@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -153,7 +154,13 @@ func (r *Runner) runJob(
 		return enum.CIStatusError, err
 	}
 
-	planner, err := model.NewSingleWorkflowPlanner("workflow.yml", bytes.NewReader(ectx.Config.Data))
+	// Inject the stage ID into the workflow name so act generates container
+	// names that are unique per-stage. Without this, concurrent matrix stages
+	// (or a new run while a stopped container from a prior run still exists)
+	// collide on the same container name derived from workflowName/jobName.
+	workflowData := uniqueWorkflowData(ectx.Config.Data, ectx.Stage.ID)
+
+	planner, err := model.NewSingleWorkflowPlanner("workflow.yml", bytes.NewReader(workflowData))
 	if err != nil {
 		reporter.finish(err, false)
 		return enum.CIStatusError, err
@@ -330,6 +337,39 @@ func matrixFilter(matrix map[string]any) map[string]map[string]bool {
 		filter[k] = map[string]bool{fmt.Sprintf("%v", v): true}
 	}
 	return filter
+}
+
+// uniqueWorkflowData returns a copy of the workflow YAML with the top-level
+// "name:" field appended with the stage ID. act derives Docker container names
+// from workflowName+jobName, so this guarantees unique container names across
+// concurrent stages and between runs whose old containers were not cleaned up.
+//
+// The regex matches only unindented "name:" lines (the workflow-level name);
+// job names and step names are always indented so they are unaffected.
+var topLevelNameRE = regexp.MustCompile(`(?m)^(name:[ \t]*.+)$`)
+
+func uniqueWorkflowData(data []byte, stageID int64) []byte {
+	done := false
+	result := topLevelNameRE.ReplaceAllFunc(data, func(match []byte) []byte {
+		if done {
+			return match
+		}
+		done = true
+		// Do NOT append to match in-place: match is a subslice of data with
+		// remaining capacity, so append would overwrite bytes in data (the
+		// character(s) after the matched name line), producing corrupt YAML.
+		suffix := fmt.Sprintf("-%d", stageID)
+		out := make([]byte, len(match)+len(suffix))
+		copy(out, match)
+		copy(out[len(match):], suffix)
+		return out
+	})
+	if !done {
+		// workflow has no name field; prepend one so container names are unique.
+		prefix := []byte(fmt.Sprintf("name: workflow-%d\n", stageID))
+		result = append(prefix, result...)
+	}
+	return result
 }
 
 // planForJob returns a new plan that contains only the stage with the target

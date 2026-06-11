@@ -78,7 +78,7 @@ ENV GITNESS_SSH_PORT=3022
 # los contenedores act). docker-compose.yaml lo sobreescribe según el entorno.
 ENV GITNESS_CI_GHA_ENABLED=true
 ENV GITNESS_CI_GHA_PARALLEL_WORKERS=2
-ENV GITNESS_CI_GHA_GIT_HOST=host.docker.internal:3000
+ENV GITNESS_CI_GHA_GIT_HOST=localhost:3000
 
 # Gitspaces
 ENV GITNESS_GITSPACE_ENABLE=true
