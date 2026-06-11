@@ -193,6 +193,13 @@ type Config struct {
 			// WorkdirRoot is where per-execution workspaces are created.
 			// Defaults to the OS temp dir when empty.
 			WorkdirRoot string `envconfig:"GITNESS_CI_GHA_WORKDIR_ROOT"`
+
+			// GitHost overrides the host:port used when the runner clones a
+			// repo on the local machine before passing the workspace to act.
+			// Useful when the repo's GitURL uses host.docker.internal but the
+			// runner process itself needs to reach gitness via localhost.
+			// Example: "localhost:3000"
+			GitHost string `envconfig:"GITNESS_CI_GHA_GIT_HOST"`
 		}
 	}
 

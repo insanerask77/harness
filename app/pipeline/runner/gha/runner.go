@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -137,8 +138,9 @@ func (r *Runner) runJob(
 	jobRun gha.JobRun,
 	reporter *reporter,
 ) (enum.CIStatus, error) {
+	cloneURL := overrideGitHost(ectx.Repo.GitURL, r.Config.CI.GHA.GitHost)
 	workdir, err := prepareWorkspace(
-		ctx, r.Config.CI.GHA.WorkdirRoot, ectx.Repo.GitURL, ectx.Execution.After, ectx.Netrc)
+		ctx, r.Config.CI.GHA.WorkdirRoot, cloneURL, ectx.Execution.After, ectx.Netrc)
 	if err != nil {
 		reporter.finish(err, false)
 		return enum.CIStatusError, err
@@ -161,6 +163,11 @@ func (r *Runner) runJob(
 		reporter.finish(err, false)
 		return enum.CIStatusError, err
 	}
+	// PlanJob includes upstream dependency jobs in the plan; those are handled
+	// at the gitness stage level (DependsOn / waiting_on_dependencies), so we
+	// strip all stages except the one that contains the target job to avoid
+	// running dependency containers concurrently across parallel matrix stages.
+	plan = planForJob(plan, jobRun.JobID)
 
 	cfg := &actrunner.Config{
 		Workdir:       workdir,
@@ -323,6 +330,37 @@ func matrixFilter(matrix map[string]any) map[string]map[string]bool {
 		filter[k] = map[string]bool{fmt.Sprintf("%v", v): true}
 	}
 	return filter
+}
+
+// planForJob returns a new plan that contains only the stage with the target
+// job, dropping upstream dependency stages. The gitness execution manager
+// handles inter-job ordering via DependsOn, so re-running upstream jobs inside
+// act would duplicate work and cause container-name conflicts when matrix
+// stages run in parallel.
+func planForJob(p *model.Plan, jobID string) *model.Plan {
+	for _, stage := range p.Stages {
+		for _, run := range stage.Runs {
+			if run.JobID == jobID {
+				return &model.Plan{Stages: []*model.Stage{stage}}
+			}
+		}
+	}
+	return p
+}
+
+// overrideGitHost replaces the host[:port] in rawURL with newHost when newHost
+// is non-empty. This lets the runner clone via localhost even when GitURL
+// contains a Docker-internal hostname like host.docker.internal.
+func overrideGitHost(rawURL, newHost string) string {
+	if newHost == "" {
+		return rawURL
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	u.Host = newHost
+	return u.String()
 }
 
 // parseRunnerImages parses the comma-separated label=image configuration.

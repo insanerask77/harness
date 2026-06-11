@@ -1,0 +1,92 @@
+# Harness + GHA runner (nektos/act embebido)
+# Multi-stage: frontend → Go binary → imagen final mínima
+
+# ── Stage 1: Build frontend ────────────────────────────────────────────────────
+FROM node:22-alpine AS frontend
+
+WORKDIR /app/web
+# Instalar dependencias (node_modules excluido del contexto por .dockerignore, ok)
+COPY web/package.json web/yarn.lock ./
+RUN yarn install --frozen-lockfile --network-timeout 300000
+
+# Copiar fuentes y construir (web/dist excluido del contexto, se genera aquí)
+COPY web/ ./
+RUN yarn build
+
+# ── Stage 2: Build Go binary ───────────────────────────────────────────────────
+FROM golang:1.25.8-alpine3.22 AS builder
+
+RUN apk add --no-cache protoc build-base git
+
+WORKDIR /app
+RUN git config --global --add safe.directory /app
+
+COPY go.mod go.sum Makefile ./
+
+ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
+RUN make dep && make tools
+
+COPY . .
+# Usar el frontend recién construido (sobrescribe cualquier dist vacío)
+COPY --from=frontend /app/web/dist ./web/dist
+
+ARG GIT_COMMIT=dev
+ARG GITNESS_VERSION_MAJOR=0
+ARG GITNESS_VERSION_MINOR=0
+ARG GITNESS_VERSION_PATCH=0
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    LDFLAGS="-X github.com/harness/gitness/version.GitCommit=${GIT_COMMIT} \
+              -X github.com/harness/gitness/version.major=${GITNESS_VERSION_MAJOR} \
+              -X github.com/harness/gitness/version.minor=${GITNESS_VERSION_MINOR} \
+              -X github.com/harness/gitness/version.patch=${GITNESS_VERSION_PATCH} \
+              -extldflags '-static'" && \
+    CGO_ENABLED=1 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -ldflags="$LDFLAGS" -o ./gitness ./cmd/gitness
+
+# ── Stage 3: CA certs ─────────────────────────────────────────────────────────
+FROM alpine:latest AS certs
+RUN apk --update add ca-certificates
+
+# ── Stage 4: imagen final mínima ──────────────────────────────────────────────
+FROM alpine/git:2.49.1
+
+WORKDIR /app
+VOLUME /data
+
+# Persistencia
+ENV XDG_CACHE_HOME=/data
+ENV GITNESS_GIT_ROOT=/data
+ENV GITNESS_REGISTRY_FILESYSTEM_ROOT_DIRECTORY=/data/registry
+ENV GITNESS_DATABASE_DRIVER=sqlite3
+ENV GITNESS_DATABASE_DATASOURCE=/data/database.sqlite
+
+# Red / auth
+ENV GITNESS_TOKEN_COOKIE_NAME=token
+ENV GITNESS_METRIC_ENABLED=false
+
+# SSH
+ENV GITNESS_SSH_ENABLE=true
+ENV GITNESS_SSH_HOST=0.0.0.0
+ENV GITNESS_SSH_PORT=3022
+
+# CI — GHA runner
+# GITNESS_CI_GHA_GIT_HOST: host accesible desde el proceso gitness (no desde
+# los contenedores act). docker-compose.yaml lo sobreescribe según el entorno.
+ENV GITNESS_CI_GHA_ENABLED=true
+ENV GITNESS_CI_GHA_PARALLEL_WORKERS=2
+ENV GITNESS_CI_GHA_GIT_HOST=host.docker.internal:3000
+
+# Gitspaces
+ENV GITNESS_GITSPACE_ENABLE=true
+
+COPY --from=builder /app/gitness /app/gitness
+COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+
+EXPOSE 3000
+EXPOSE 3022
+
+ENTRYPOINT ["/app/gitness", "server"]

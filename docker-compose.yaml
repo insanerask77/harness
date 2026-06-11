@@ -1,0 +1,49 @@
+services:
+  gitness:
+    build:
+      context: .
+      dockerfile: Dockerfile.gha
+    image: harness-gha:local
+    container_name: harness-gha
+    restart: unless-stopped
+
+    ports:
+      - "3000:3000"   # UI + API
+      - "3022:3022"   # SSH git
+
+    volumes:
+      # datos persistentes (repos, DB, registry)
+      - harness-data:/data
+      # socket Docker para que act pueda lanzar contenedores
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    environment:
+      GITNESS_PRINCIPAL_ADMIN_EMAIL: admin@example.com
+      GITNESS_PRINCIPAL_ADMIN_PASSWORD: changeit
+
+      # URL pública accesible desde el navegador y desde git push
+      GITNESS_HTTP_BIND: "0.0.0.0:3000"
+
+      # GHA: los contenedores que act lanza necesitan llegar a gitness
+      # En Linux con Docker nativo, la IP del gateway es la del host.
+      # En Docker Desktop (Mac/Windows) usa host.docker.internal.
+      GITNESS_CI_GHA_GIT_HOST: "host.docker.internal:3000"
+
+      # Webhooks hacia localhost están permitidos (útil para desarrollo)
+      GITNESS_WEBHOOK_ALLOW_LOOPBACK: "true"
+
+    # En Linux, host.docker.internal no se resuelve automáticamente;
+    # este extra_hosts hace que los contenedores puedan usar ese nombre.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/v1/system/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  harness-data:
+    driver: local
