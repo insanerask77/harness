@@ -822,6 +822,7 @@ pipelines:
   enterPipelineName: Enter pipeline name
   yamlPath: YAML Path
   enterYAMLPath: Enter YAML path
+  yamlPathHelp: Defaults to a GitHub Actions workflow under .github/workflows/. Use a .harness/*.yaml or .drone.yml path for Harness or Drone pipelines instead.
   failedToCreatePipeline: Failed to create pipeline
   saveAndRun: Save and Run
   editPipeline: Edit pipeline {{pipeline}}

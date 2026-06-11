@@ -42,7 +42,8 @@ import { highlightInsertedYAML } from 'components/SourceCodeEditor/EditorUtils'
 import type { MonacoCodeEditorRef } from 'components/SourceCodeEditor/SourceCodeEditorWithRef'
 import pipelineSchemaV1 from './schema/pipeline-schema-v1.json'
 import pipelineSchemaV0 from './schema/pipeline-schema-v0.json'
-import { DRONE_CONFIG_YAML_FILE_SUFFIXES, YamlVersion } from './Constants'
+import githubWorkflowSchema from './schema/github-workflow.json'
+import { DRONE_CONFIG_YAML_FILE_SUFFIXES, GHA_CONFIG_YAML_FILE_REGEX, YamlVersion } from './Constants'
 
 import css from './AddUpdatePipeline.module.scss'
 
@@ -83,6 +84,19 @@ const StarterPipelineV0: Record<string, unknown> = {
     }
   ]
 }
+
+// raw YAML literal: stringify() would quote the 'on' key (YAML 1.1 boolean)
+const StarterPipelineGHA = `name: ci
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "hello world"
+`
 
 enum PipelineSaveAndRunAction {
   SAVE,
@@ -172,6 +186,10 @@ const AddUpdatePipeline = (): JSX.Element => {
 
   // set YAML version for Pipeline setup
   useEffect(() => {
+    if (GHA_CONFIG_YAML_FILE_REGEX.test(pipelineData?.config_path || '')) {
+      setYAMLVersion(YamlVersion.GITHUB_ACTIONS)
+      return
+    }
     setYAMLVersion(
       DRONE_CONFIG_YAML_FILE_SUFFIXES.find((suffix: string) => pipelineData?.config_path?.endsWith(suffix))
         ? YamlVersion.V0
@@ -191,7 +209,11 @@ const AddUpdatePipeline = (): JSX.Element => {
     } else {
       // load with starter pipeline
       try {
-        setPipelineYAML(stringify(yamlVersion === YamlVersion.V1 ? StarterPipelineV1 : StarterPipelineV0))
+        setPipelineYAML(
+          yamlVersion === YamlVersion.GITHUB_ACTIONS
+            ? StarterPipelineGHA
+            : stringify(yamlVersion === YamlVersion.V1 ? StarterPipelineV1 : StarterPipelineV0)
+        )
       } catch (ex) {
         // ignore exception
       }
@@ -489,14 +511,20 @@ const AddUpdatePipeline = (): JSX.Element => {
             <Layout.Horizontal className={css.layout}>
               <Container
                 className={cx(css.editorContainer, {
-                  [css.extendedHeight]: isExistingPipeline || yamlVersion === YamlVersion.V0
+                  [css.extendedHeight]: isExistingPipeline || yamlVersion !== YamlVersion.V1
                 })}>
                 <AdvancedSourceCodeEditor
                   language={'yaml'}
-                  schema={yamlVersion === YamlVersion.V1 ? pipelineSchemaV1 : pipelineSchemaV0}
+                  schema={
+                    yamlVersion === YamlVersion.GITHUB_ACTIONS
+                      ? githubWorkflowSchema
+                      : yamlVersion === YamlVersion.V1
+                      ? pipelineSchemaV1
+                      : pipelineSchemaV0
+                  }
                   source={pipelineYAML}
                   onChange={(value: string) => setPipelineYAML(value)}
-                  enableCodeLens
+                  enableCodeLens={yamlVersion === YamlVersion.V1}
                   onEntityAddUpdate={entityData => setEntityDataFromYAML(entityData)}
                   onEntityFieldAddUpdate={entityFieldData => setEntityFieldDataFromYAML(entityFieldData)}
                   ref={editorRef}

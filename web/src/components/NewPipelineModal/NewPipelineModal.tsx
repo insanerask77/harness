@@ -38,7 +38,7 @@ import { useStrings } from 'framework/strings'
 import { BranchTagSelect } from 'components/BranchTagSelect/BranchTagSelect'
 import { useAppContext } from 'AppContext'
 import { getErrorMessage } from 'utils/Utils'
-import { DEFAULT_YAML_PATH_PREFIX, DEFAULT_YAML_PATH_SUFFIX } from '../../pages/AddUpdatePipeline/Constants'
+import { GHA_YAML_PATH_PREFIX, GHA_YAML_PATH_SUFFIX } from '../../pages/AddUpdatePipeline/Constants'
 
 import css from './NewPipelineModal.module.scss'
 
@@ -127,7 +127,7 @@ const useNewPipelineModal = () => {
                           const path = input.trim().replace(/\s/g, '')
                           formik?.setFieldValue(
                             'yamlPath',
-                            DEFAULT_YAML_PATH_PREFIX.concat(path).concat(DEFAULT_YAML_PATH_SUFFIX)
+                            GHA_YAML_PATH_PREFIX.concat(path).concat(GHA_YAML_PATH_SUFFIX)
                           )
                         }
                       }}
@@ -147,11 +147,14 @@ const useNewPipelineModal = () => {
                         />
                       </Container>
                     </Layout.Vertical>
-                    <FormInput.Text
-                      name="yamlPath"
-                      label={getString('pipelines.yamlPath')}
-                      placeholder={getString('pipelines.enterYAMLPath')}
-                    />
+                    <Layout.Vertical spacing="xsmall">
+                      <FormInput.Text
+                        name="yamlPath"
+                        label={getString('pipelines.yamlPath')}
+                        placeholder={getString('pipelines.enterYAMLPath')}
+                      />
+                      <Text font={{ variation: FontVariation.SMALL }}>{getString('pipelines.yamlPathHelp')}</Text>
+                    </Layout.Vertical>
                   </Layout.Vertical>
                   <Layout.Horizontal spacing="medium" width="100%">
                     <Button variation={ButtonVariation.PRIMARY} text={getString('create')} type="submit" />

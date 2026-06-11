@@ -174,6 +174,26 @@ type Config struct {
 		// In that case, GITNESS_URL_CONTAINER should also be changed
 		// (eg to http://<gitness_container_name>:<port>).
 		ContainerNetworks []string `envconfig:"GITNESS_CI_CONTAINER_NETWORKS"`
+
+		// GHA configures the embedded act engine used to execute pipelines
+		// whose config is a GitHub Actions workflow (.github/workflows/*.yml).
+		GHA struct {
+			Enabled         bool `envconfig:"GITNESS_CI_GHA_ENABLED" default:"true"`
+			ParallelWorkers int  `envconfig:"GITNESS_CI_GHA_PARALLEL_WORKERS" default:"2"`
+
+			// RunnerImages maps runs-on labels to container images as
+			// comma-separated label=image pairs ('=' is used as separator
+			// because image references contain colons).
+			//nolint:lll
+			RunnerImages string `envconfig:"GITNESS_CI_GHA_RUNNER_IMAGES" default:"ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest,ubuntu-24.04=ghcr.io/catthehacker/ubuntu:act-24.04,ubuntu-22.04=ghcr.io/catthehacker/ubuntu:act-22.04"`
+
+			// DefaultImage is used for runs-on labels without a mapping.
+			DefaultImage string `envconfig:"GITNESS_CI_GHA_DEFAULT_IMAGE" default:"ghcr.io/catthehacker/ubuntu:act-latest"`
+
+			// WorkdirRoot is where per-execution workspaces are created.
+			// Defaults to the OS temp dir when empty.
+			WorkdirRoot string `envconfig:"GITNESS_CI_GHA_WORKDIR_ROOT"`
+		}
 	}
 
 	// Database defines the database configuration parameters.

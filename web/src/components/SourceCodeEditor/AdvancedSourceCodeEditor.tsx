@@ -37,7 +37,7 @@ type AdvancedSourceCodeEditorProps = SourceCodeEditorProps & {
 
 const Editor = forwardRef<MonacoCodeEditorRef, AdvancedSourceCodeEditorProps>((props, ref) => {
   const { getString } = useStrings()
-  const { onChange, onEntityAddUpdate, onEntityFieldAddUpdate } = props
+  const { onChange, onEntityAddUpdate, onEntityFieldAddUpdate, enableCodeLens } = props
   const editorRef = useRef<MonacoCodeEditorRef | null>(null)
   const [entityYAMLData, setEntityYAMLData] = useState<EntityAddUpdateInterface>()
   const [entityFieldData, setEntityFieldYAMLData] = useState<Partial<EntityAddUpdateInterface>>()
@@ -107,7 +107,7 @@ const Editor = forwardRef<MonacoCodeEditorRef, AdvancedSourceCodeEditorProps>((p
     [] // eslint-disable-line react-hooks/exhaustive-deps
   )
 
-  useCodeLenses({ editor: editorRef.current, codeLensConfigs })
+  useCodeLenses({ editor: editorRef.current, codeLensConfigs: enableCodeLens ? codeLensConfigs : undefined })
 
   const handleOnCodeLensClick = useCallback(args => {
     try {
@@ -185,7 +185,7 @@ const Editor = forwardRef<MonacoCodeEditorRef, AdvancedSourceCodeEditorProps>((p
       {...props}
       onChange={debouncedHandleYAMLUpdate}
       ref={editorRef}
-      editorOptions={{ codeLens: true }}
+      editorOptions={{ codeLens: enableCodeLens }}
       editorDidMount={editorDidMount}
     />
   )

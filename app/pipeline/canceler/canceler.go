@@ -146,6 +146,12 @@ func (s *service) Cancel(ctx context.Context, repo *types.RepositoryCore, execut
 	execution.Stages = stages
 	log.Info().Msg("canceler: successfully cancelled build")
 
+	// signal the cancellation to the schedulers so that runners watching the
+	// execution (manager.Watch) abort the stages that are currently running.
+	if err := s.scheduler.Cancel(ctx, execution.ID); err != nil {
+		log.Warn().Err(err).Msg("canceler: cannot signal cancellation to scheduler")
+	}
+
 	s.sseStreamer.Publish(ctx, repo.ParentID, enum.SSETypeExecutionCanceled, execution)
 
 	return nil

@@ -16,7 +16,8 @@
 
 export enum YamlVersion {
   V0,
-  V1
+  V1,
+  GITHUB_ACTIONS
 }
 
 export const DEFAULT_YAML_PATH_PREFIX = '.harness/'
@@ -24,4 +25,8 @@ export const DEFAULT_YAML_PATH_SUFFIX = '.yaml'
 
 export const DRONE_CONFIG_YAML_FILE_SUFFIXES = ['.drone.yml', '.drone.yaml']
 
-export const V1_SCHEMA_YAML_FILE_REGEX = /^(.*v1\.ya?ml)$/i
+// GitHub Actions workflows live under .github/workflows/ and are executed
+// by the embedded act engine on the backend.
+export const GHA_YAML_PATH_PREFIX = '.github/workflows/'
+export const GHA_YAML_PATH_SUFFIX = '.yml'
+export const GHA_CONFIG_YAML_FILE_REGEX = /^\.github\/workflows\/[^/]+\.ya?ml$/i

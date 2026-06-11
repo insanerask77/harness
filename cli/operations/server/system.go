@@ -17,6 +17,7 @@ package server
 import (
 	"github.com/harness/gitness/app/bootstrap"
 	"github.com/harness/gitness/app/pipeline/resolver"
+	gharunner "github.com/harness/gitness/app/pipeline/runner/gha"
 	"github.com/harness/gitness/app/server"
 	"github.com/harness/gitness/app/services"
 	"github.com/harness/gitness/http"
@@ -32,6 +33,7 @@ type System struct {
 	sshServer       *ssh.Server
 	resolverManager *resolver.Manager
 	poller          *poller.Poller
+	ghaPoller       *gharunner.Poller
 	services        services.Services
 	metricServer    http.ListenAndServeServer
 }
@@ -45,6 +47,7 @@ func NewSystem(
 	server *server.Server,
 	sshServer *ssh.Server,
 	poller *poller.Poller,
+	ghaPoller *gharunner.Poller,
 	resolverManager *resolver.Manager,
 	services services.Services,
 	metricServer http.ListenAndServeServer,
@@ -54,6 +57,7 @@ func NewSystem(
 		server:          server,
 		sshServer:       sshServer,
 		poller:          poller,
+		ghaPoller:       ghaPoller,
 		resolverManager: resolverManager,
 		services:        services,
 		metricServer:    metricServer,

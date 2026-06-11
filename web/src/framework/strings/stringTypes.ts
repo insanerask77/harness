@@ -711,6 +711,7 @@ export interface StringsMap {
   'pipelines.updatePipelineSuccess': string
   'pipelines.updated': string
   'pipelines.yamlPath': string
+  'pipelines.yamlPathHelp': string
   'plugins.select': string
   'plugins.stepLabel': string
   'plugins.title': string

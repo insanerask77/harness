@@ -83,6 +83,7 @@ import (
 	"github.com/harness/gitness/app/pipeline/manager"
 	"github.com/harness/gitness/app/pipeline/resolver"
 	"github.com/harness/gitness/app/pipeline/runner"
+	gharunner "github.com/harness/gitness/app/pipeline/runner/gha"
 	"github.com/harness/gitness/app/pipeline/scheduler"
 	"github.com/harness/gitness/app/pipeline/triggerer"
 	"github.com/harness/gitness/app/router"
@@ -270,6 +271,7 @@ func initSystem(ctx context.Context, config *types.Config) (*cliserver.System, e
 		file.WireSet,
 		converter.WireSet,
 		runner.WireSet,
+		gharunner.WireSet,
 		sse.WireSet,
 		scheduler.WireSet,
 		commit.WireSet,

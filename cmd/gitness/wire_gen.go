@@ -8,7 +8,6 @@ package main
 
 import (
 	"context"
-
 	check2 "github.com/harness/gitness/app/api/controller/check"
 	connector2 "github.com/harness/gitness/app/api/controller/connector"
 	"github.com/harness/gitness/app/api/controller/execution"
@@ -72,6 +71,7 @@ import (
 	"github.com/harness/gitness/app/pipeline/manager"
 	"github.com/harness/gitness/app/pipeline/resolver"
 	"github.com/harness/gitness/app/pipeline/runner"
+	"github.com/harness/gitness/app/pipeline/runner/gha"
 	"github.com/harness/gitness/app/pipeline/scheduler"
 	"github.com/harness/gitness/app/pipeline/triggerer"
 	router2 "github.com/harness/gitness/app/router"
@@ -189,9 +189,10 @@ import (
 	"github.com/harness/gitness/store/database/dbtx"
 	"github.com/harness/gitness/types"
 	"github.com/harness/gitness/types/check"
+)
 
+import (
 	_ "github.com/lib/pq"
-
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -752,6 +753,8 @@ func initSystem(ctx context.Context, config *types.Config) (*server.System, erro
 		return nil, err
 	}
 	poller := runner.ProvideExecutionPoller(runtimeRunner, client)
+	ghaRunner := gha.ProvideGHARunner(config, executionManager, encrypter)
+	ghaPoller := gha.ProvideGHAPoller(config, executionManager, ghaRunner)
 	triggerConfig := server.ProvideTriggerConfig(config)
 	triggerService, err := trigger2.ProvideService(ctx, triggerConfig, triggerStore, commitService, pullReqStore, repoFinder, pipelineStore, triggererTriggerer, readerFactory2, readerFactory3)
 	if err != nil {
@@ -885,6 +888,6 @@ func initSystem(ctx context.Context, config *types.Config) (*server.System, erro
 	}
 	servicesServices := services.ProvideServices(service3, pullreqService, triggerService, jobScheduler, collectorJob, sizeCalculator, repoService, cleanupService, notificationService, keywordsearchService, gitspaceServices, instrumentService, consumer, repositoryCount, service4, branchService, repoactivityService, asyncprocessingService, jobRpmRegistryIndex, languageAnalyzer)
 	listenAndServeServer := server.ProvideNoOpMetricServer()
-	serverSystem := server.NewSystem(bootstrapBootstrap, serverServer, sshServer, poller, resolverManager, servicesServices, listenAndServeServer)
+	serverSystem := server.NewSystem(bootstrapBootstrap, serverServer, sshServer, poller, ghaPoller, resolverManager, servicesServices, listenAndServeServer)
 	return serverSystem, nil
 }

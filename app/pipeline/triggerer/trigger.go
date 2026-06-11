@@ -24,6 +24,7 @@ import (
 	"github.com/harness/gitness/app/pipeline/checks"
 	"github.com/harness/gitness/app/pipeline/converter"
 	"github.com/harness/gitness/app/pipeline/file"
+	"github.com/harness/gitness/app/pipeline/gha"
 	"github.com/harness/gitness/app/pipeline/manager"
 	"github.com/harness/gitness/app/pipeline/resolver"
 	"github.com/harness/gitness/app/pipeline/scheduler"
@@ -203,10 +204,22 @@ func (t *triggerer) Trigger(
 
 	// For drone, follow the existing path of calculating dependencies, creating a DAG,
 	// and creating stages accordingly. For V1 YAML - for now we can just parse the stages
-	// and create them sequentially.
+	// and create them sequentially. GitHub Actions workflows are detected by config
+	// path and parsed into one stage per job, executed by the embedded act engine.
 	stages := []*types.Stage{}
 	//nolint:nestif // refactor if needed
-	if !isV1Yaml(file.Data) {
+	if gha.IsGHAConfigPath(pipeline.ConfigPath) {
+		stages, err = parseGHAStages(file.Data, repo, execution)
+		if err != nil {
+			log.Warn().Err(err).Msg("trigger: cannot parse github actions workflow")
+			return t.createExecutionWithError(ctx, pipeline, base, err.Error())
+		}
+		if len(stages) == 0 {
+			log.Info().Msg("trigger: skipping execution, workflow defines no jobs for this event")
+			//nolint:nilnil // on purpose, same as the drone path with no matching pipelines
+			return nil, nil
+		}
+	} else if !isV1Yaml(file.Data) {
 		// Convert from jsonnet/starlark to drone yaml
 		args := &converter.ConvertArgs{
 			Repo:         repo,
@@ -390,6 +403,48 @@ func trunc(s string, i int) string {
 		return string(runes[:i])
 	}
 	return s
+}
+
+// parseGHAStages parses a GitHub Actions workflow into stages. One stage is
+// created per job (or per matrix combination), with needs mapped to stage
+// dependencies. The stages carry the gha type so they are picked up by the
+// embedded act runner instead of the drone docker runner.
+func parseGHAStages(
+	data []byte,
+	repo *types.Repository,
+	execution *types.Execution,
+) ([]*types.Stage, error) {
+	runs, err := gha.ParseJobRunsForEvent(data, execution.Event)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UnixMilli()
+	stages := make([]*types.Stage, len(runs))
+	for i, run := range runs {
+		status := enum.CIStatusWaitingOnDeps
+		if len(run.DependsOn) == 0 {
+			status = enum.CIStatusPending
+		}
+		stages[i] = &types.Stage{
+			RepoID:    repo.ID,
+			Number:    int64(i + 1),
+			Name:      run.StageName,
+			Kind:      "pipeline",
+			Type:      gha.StageType,
+			OS:        "linux",
+			Arch:      "amd64",
+			Status:    status,
+			DependsOn: run.DependsOn,
+			// match GitHub needs semantics: dependents only run when all
+			// their dependencies succeeded.
+			OnSuccess: true,
+			OnFailure: false,
+			Created:   now,
+			Updated:   now,
+		}
+	}
+	return stages, nil
 }
 
 // parseV1Stages tries to parse the yaml into a list of stages and returns an error

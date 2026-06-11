@@ -132,6 +132,16 @@ func (c *command) run(*kingpin.ParseContext) error {
 			)
 			return nil
 		})
+		// start poller for GitHub Actions executions (embedded act engine).
+		if config.CI.GHA.Enabled {
+			g.Go(func() error {
+				system.ghaPoller.Poll(
+					logger.WithWrappedZerolog(ctx),
+					config.CI.GHA.ParallelWorkers,
+				)
+				return nil
+			})
+		}
 	}
 
 	if config.SSH.Enable {
